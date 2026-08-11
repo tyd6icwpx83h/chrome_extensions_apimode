@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "API Request Tester & CSV Exporter",
+  "version": "1.0.0",
+  "description": "APIリクエストを送信し、レスポンスを無加工表示およびCSV形式でダウンロードできるChrome拡張機能",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "action": {
+    "default_title": "API Testerを開く"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

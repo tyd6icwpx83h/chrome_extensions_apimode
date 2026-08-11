@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>API Response Result</title>
+  <style>
+    body {
+      background-color: #ffffff;
+      color: #000000;
+      font-family: monospace;
+      padding: 20px;
+      margin: 0;
+    }
+    .header-area {
+      margin-bottom: 10px;
+    }
+    #downloadBtn {
+      color: #000000;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #downloadBtn:hover {
+      background-color: #e0e0e0;
+    }
+    hr {
+      border: 0;
+      border-top: 1px solid #000000;
+      margin: 15px 0;
+    }
+    #responseArea {
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    /* JSONツリー表示用のスタイル */
+    details {
+      margin-left: 16px;
+    }
+    summary {
+      cursor: pointer;
+      font-weight: bold;
+      color: #333;
+    }
+    .json-key {
+      color: #881391;
+      font-weight: bold;
+    }
+    .json-string {
+      color: #c41a16;
+    }
+    .json-number {
+      color: #1c00cf;
+    }
+    .json-boolean {
+      color: #0d22aa;
+      font-weight: bold;
+    }
+    .json-null {
+      color: #808080;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-area">
+    <button id="downloadBtn">CSVでダウンロードする</button>
+  </div>
+  <hr>
+  <div id="responseArea"></div>
+
+  <script src="response.js"></script>
+</body>
+</html>

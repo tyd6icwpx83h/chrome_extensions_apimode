@@ -3,117 +3,246 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
-      /* width: 320px;
-      padding: 15px;
-      margin: 0;
-      background-color: #ffffff;
-      color: #000000;
-      font-family: sans-serif;
-    }
-    .field {
-      margin-bottom: 12px;
-    }
-    label {
-      display: block;
-      font-size: 12px;
-      margin-bottom: 4px;
-      font-weight: bold;
-    }
-    input[type="text"], select {
-      width: 100%;
+    * {
       box-sizing: border-box;
-      padding: 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background-color: #ffffff;
-      color: #000000;
     }
-    .option-row {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 6px;
+
+    body {
+      padding: 20px;
+      margin: 0;
+      background-color: #3cad7e;
+      font-family: 'Arial', sans-serif;
+      color: #333;
     }
-    .option-row input {
-      flex: 1;
+
+    h1.title {
+      color: #fff;
+      text-transform: uppercase;
+      text-align: center;
+      font-size: 24px;
+      margin-top: 0;
+      margin-bottom: 20px;
     }
-    .btn-small {
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      cursor: pointer;
+
+    .field {
+      margin-bottom: 20px;
     }
-    .btn-submit {
+
+    /* --- 入力ボックス（フローティングラベル）デザイン --- */
+    .nice-wrap {
+      position: relative;
       width: 100%;
-      padding: 8px;
-      margin-top: 8px;
-      background-color: #f0f0f0;
-      color: #000000;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    .nice-label {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-size: 14px;
+      color: #a0a0a0;
+      transition: all 0.25s ease;
+      pointer-events: none;
+    }
+
+    .nice-label.focus {
+      top: -22px;
+      left: 5px;
+      font-size: 13px;
+      color: #fff;
       font-weight: bold;
     }
-    .btn-submit:hover {
-      background-color: #e0e0e0;
+
+    .nice-textbox {
+      position: relative;
+      display: block;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      color: #333;
+      outline: none;
+      background-color: #ffffff;
     }
+
+    /* --- カスタムプルダウン（Select Box）デザイン --- */
+    .selectdiv {
+      position: relative;
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    select::-ms-expand {
+      display: none;
+    }
+
+    .selectdiv:after {
+      content: '<>';
+      font: 15px "Consolas", monospace;
+      color: #333;
+      -webkit-transform: rotate(90deg);
+      -moz-transform: rotate(90deg);
+      -ms-transform: rotate(90deg);
+      transform: rotate(90deg);
+      right: 12px;
+      top: 10px;
+      padding: 0 0 2px;
+      border-bottom: 1px solid #999;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .selectdiv select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      display: block;
+      width: 100%;
+      height: 42px;
+      padding: 0px 32px 0px 12px;
+      font-size: 14px;
+      line-height: 1.75;
+      color: #333;
+      background-color: #ffffff;
+      background-image: none;
+      border: 1px solid #cccccc;
+      border-radius: 5px;
+      word-break: normal;
+      outline: none;
+    }
+
+    /* --- その他要素の調整 --- */
+    .field-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #ffffff;
+      margin-bottom: 4px;
+      display: block;
+    }
+
     .input-with-button {
       display: flex;
       gap: 6px;
     }
-    .input-with-button input {
+
+    .input-with-button .nice-wrap {
       flex: 1;
+      margin-top: 15px;
+    }
+
+    .option-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .btn-small {
+      width: 36px;
+      height: 42px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #ffffff;
+      color: #333;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .btn-small:hover {
+      background-color: #f0f0f0;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      background-color: #ffffff;
+      color: #3cad7e;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .btn-submit:hover {
+      background-color: #f8f8f8;
     }
   </style>
 </head>
 <body>
 
-  <div class="field">
-    <label for="apiUrl">APIリクエスト (URL)</label>
-    <input type="text" id="apiUrl" placeholder="https://api.example.com/data">
-    <!-- 履歴選択用のドロップダウンを追加 -->
-    <select id="urlHistory" style="margin-top: 4px;">
-      <option value="">-- 過去に使用したURLから選択 --</option>
-    </select>
-  </div>
+  <h1 class="title">API Tester</h1>
 
+  <!-- APIリクエスト (URL) -->
   <div class="field">
-    <label for="authType">認証方式</label>
-    <select id="authType" style="margin-bottom: 6px;">
-      <option value="none" selected>なし (None)</option>
-      <option value="bearer">Bearerトークン</option>
-      <option value="jwt">JWT</option>
-      <option value="oauth2">OAuth 2.0 (Access Token)</option>
-    </select>
-
-    <!-- 認証入力コンテナ（デフォルトは非表示） -->
-    <div id="authInputContainer" class="input-with-button" style="display: none;">
-      <input type="password" id="authInfo" placeholder="トークンを入力...">
-      <button type="button" id="toggleAuthBtn" class="btn-small" title="表示/非表示切り替え">👁️</button>
+    <div class="nice-wrap">
+      <input type="text" id="apiUrl" class="nice-textbox">
+      <label class="nice-label" for="apiUrl">API URL (https://...)</label>
+    </div>
+    <div class="selectdiv">
+      <select id="urlHistory">
+        <option value="">-- 過去に使用したURLから選択 --</option>
+      </select>
     </div>
   </div>
 
+  <!-- HTTPステータス (メソッド) -->
   <div class="field">
-    <label for="httpMethod">HTTPステータス (メソッド等)</label>
-    <select id="httpMethod">
-      <option value="GET" selected>GET</option>
-      <option value="HEAD">HEAD</option>
-      <option value="OPTIONS">OPTIONS</option>
-      <option value="TRACE">TRACE</option>
-      <option value="PUT">PUT</option>
-      <option value="DELETE">DELETE</option>
-      <option value="POST">POST</option>
-      <option value="PATCH">PATCH</option>
-      <option value="CONNECT">CONNECT</option>
-    </select>
+    <span class="field-title">HTTP メソッド</span>
+    <div class="selectdiv">
+      <select id="httpMethod">
+        <option value="GET" selected>GET</option>
+        <option value="HEAD">HEAD</option>
+        <option value="OPTIONS">OPTIONS</option>
+        <option value="TRACE">TRACE</option>
+        <option value="PUT">PUT</option>
+        <option value="DELETE">DELETE</option>
+        <option value="POST">POST</option>
+        <option value="PATCH">PATCH</option>
+        <option value="CONNECT">CONNECT</option>
+      </select>
+    </div>
   </div>
 
+  <!-- 認証方式 -->
   <div class="field">
-    <label>オプション入力</label>
+    <span class="field-title">認証方式</span>
+    <div class="selectdiv">
+      <select id="authType">
+        <option value="none" selected>なし (None)</option>
+        <option value="bearer">Bearerトークン</option>
+        <option value="jwt">JWT</option>
+        <option value="oauth2">OAuth 2.0 (Access Token)</option>
+      </select>
+    </div>
+
+    <!-- 認証トークン入力 (非表示/表示制御) -->
+    <div id="authInputContainer" class="input-with-button" style="display: none;">
+      <div class="nice-wrap">
+        <input type="password" id="authInfo" class="nice-textbox">
+        <label class="nice-label" for="authInfo">トークンを入力...</label>
+      </div>
+      <button type="button" id="toggleAuthBtn" class="btn-small" style="margin-top: 15px;" title="表示/非表示切り替え">👁️</button>
+    </div>
+  </div>
+
+  <!-- オプション入力 -->
+  <div class="field">
+    <span class="field-title">オプションヘッダー</span>
     <div id="optionsContainer">
       <div class="option-row">
-        <input type="text" class="opt-key" placeholder="Key">
-        <input type="text" class="opt-val" placeholder="Value">
+        <div class="nice-wrap" style="margin-top:0;">
+          <input type="text" class="opt-key nice-textbox">
+          <label class="nice-label">Header Key</label>
+        </div>
+        <div class="nice-wrap" style="margin-top:0;">
+          <input type="text" class="opt-val nice-textbox">
+          <label class="nice-label">Value</label>
+        </div>
         <button type="button" class="btn-small add-btn">＋</button>
         <button type="button" class="btn-small remove-btn">ー</button>
       </div>

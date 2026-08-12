@@ -78,10 +78,17 @@
   </div>
 
   <div class="field">
-    <label for="authInfo">認証情報 (Authorization Header等)</label>
-    <div class="input-with-button">
-      <!-- 最初は mask (password型) にしておく -->
-      <input type="password" id="authInfo" placeholder="Bearer token...">
+    <label for="authType">認証方式</label>
+    <select id="authType" style="margin-bottom: 6px;">
+      <option value="none" selected>なし (None)</option>
+      <option value="bearer">Bearerトークン</option>
+      <option value="jwt">JWT</option>
+      <option value="oauth2">OAuth 2.0 (Access Token)</option>
+    </select>
+
+    <!-- 認証入力コンテナ（デフォルトは非表示） -->
+    <div id="authInputContainer" class="input-with-button" style="display: none;">
+      <input type="password" id="authInfo" placeholder="トークンを入力...">
       <button type="button" id="toggleAuthBtn" class="btn-small" title="表示/非表示切り替え">👁️</button>
     </div>
   </div>

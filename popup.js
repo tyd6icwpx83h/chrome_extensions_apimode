@@ -3,10 +3,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const apiUrlInput = document.getElementById('apiUrl');
   const urlHistorySelect = document.getElementById('urlHistory');
 
-  // --- ★ここから：URL履歴の読み込みと選択処理 ---
+  // --- URL履歴処理 ---
   const MAX_HISTORY = 5;
-
-  // 履歴ドロップダウンの表示更新関数
   const updateHistoryDropdown = (historyList) => {
     urlHistorySelect.innerHTML = '<option value="">-- 過去に使用したURLから選択 --</option>';
     historyList.forEach(url => {
@@ -17,39 +15,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   };
 
-  // 初期読み込み時に保存済み履歴を取得してセット
   const { urlHistory = [] } = await chrome.storage.local.get('urlHistory');
   updateHistoryDropdown(urlHistory);
 
-  // ドロップダウンからURLが選択されたら入力欄に反映
   urlHistorySelect.addEventListener('change', (e) => {
-    if (e.target.value) {
-      apiUrlInput.value = e.target.value;
-    }
+    if (e.target.value) apiUrlInput.value = e.target.value;
   });
 
-  // URLを履歴に保存する処理関数
   const saveUrlToHistory = async (newUrl) => {
     const data = await chrome.storage.local.get('urlHistory');
     let history = data.urlHistory || [];
-    
-    // 既に存在するURLなら一度取り除いて最新を先頭にする
     history = history.filter(url => url !== newUrl);
     history.unshift(newUrl);
-
-    // 最大5個までに制限
-    if (history.length > MAX_HISTORY) {
-      history = history.slice(0, MAX_HISTORY);
-    }
-
+    if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
     await chrome.storage.local.set({ urlHistory: history });
     updateHistoryDropdown(history);
   };
-  // --- ★ここまで：URL履歴の処理 ---
 
-  // 認証情報のマスク切替処理
+  // --- 認証方式の切り替え処理 ---
+  const authTypeSelect = document.getElementById('authType');
+  const authInputContainer = document.getElementById('authInputContainer');
   const authInput = document.getElementById('authInfo');
   const toggleAuthBtn = document.getElementById('toggleAuthBtn');
+
+  authTypeSelect.addEventListener('change', (e) => {
+    const type = e.target.value;
+    if (type === 'none') {
+      authInputContainer.style.display = 'none';
+      authInput.value = '';
+    } else {
+      authInputContainer.style.display = 'flex';
+      if (type === 'bearer') authInput.placeholder = 'Bearerトークン文字列（Bearerの入力は不要）';
+      else if (type === 'jwt') authInput.placeholder = 'eyJhbGciOi... (JWT文字列)';
+      else if (type === 'oauth2') authInput.placeholder = 'OAuth 2.0 アクセストークン';
+    }
+  });
+
+  // マスク切替処理
   if (toggleAuthBtn) {
     toggleAuthBtn.addEventListener('click', () => {
       if (authInput.type === 'password') {
@@ -62,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // オプション入力行の追加・削除イベントの制御
+  // --- オプション入力行の追加・削除 ---
   container.addEventListener('click', (e) => {
     if (e.target.classList.contains('add-btn')) {
       const newRow = document.createElement('div');
@@ -82,65 +84,84 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 「送信」ボタン押下処理
+  // --- 「送信」ボタン押下処理 ---
   document.getElementById('sendBtn').addEventListener('click', async () => {
     const url = apiUrlInput.value.trim();
-    const auth = document.getElementById('authInfo').value.trim();
     const method = document.getElementById('httpMethod').value.trim() || 'GET';
+    const authType = authTypeSelect.value;
+    const rawAuthValue = authInput.value.trim();
 
     if (!url) {
       alert('URLを入力してください');
       return;
     }
 
-    // ★リクエスト成功／失敗に関わらず送信時にURL履歴を保存
     await saveUrlToHistory(url);
 
     // オプション項目の収集
-    const options = {};
+    const headers = {};
     const rows = container.querySelectorAll('.option-row');
     rows.forEach(row => {
       const key = row.querySelector('.opt-key').value.trim();
       const val = row.querySelector('.opt-val').value.trim();
-      if (key) {
-        options[key] = val;
-      }
+      if (key) headers[key] = val;
     });
 
-    // APIリクエストの実行
-    let rawResponseText = '';
-    try {
-      const headers = { ...options };
-      if (auth) {
-        headers['Authorization'] = auth;
+    // 認証ヘッダーの付与制御
+    if (authType !== 'none' && rawAuthValue) {
+      if (authType === 'bearer' || authType === 'jwt' || authType === 'oauth2') {
+        // 先頭に Bearer が付いていなければ自動補完
+        const token = rawAuthValue.replace(/^Bearer\s+/i, '');
+        headers['Authorization'] = `Bearer ${token}`;
       }
+    }
 
-      // fetchを実行（CORSエラー対策で mode を指定）
+    // APIリクエストの実行
+    let responseData = {
+      status: null,
+      statusText: '',
+      headers: {},
+      body: ''
+    };
+
+    try {
       const response = await fetch(url, {
         method: method,
         headers: headers
       });
 
-      // レスポンスのテキストを取得
-      rawResponseText = await response.text();
+      // レスポンスヘッダーの取得
+      const resHeaders = {};
+      response.headers.forEach((val, key) => {
+        resHeaders[key] = val;
+      });
 
-      // HTTPエラー（4xx, 5xx等）の場合でもレスポンスボディを表示に含める
-      if (!response.ok) {
-        rawResponseText = `[HTTP Status: ${response.status} ${response.statusText}]\n\n${rawResponseText}`;
-      }
+      const rawText = await response.text();
+
+      responseData = {
+        status: response.status,
+        statusText: response.statusText,
+        headers: resHeaders,
+        body: rawText
+      };
+
     } catch (err) {
-      console.error('Fetch error:', err);
-      rawResponseText = `[API Fetch Error]\n${err.message}\n\n※URLやネットワーク接続、またはCORS制限を確認してください。`;
+      responseData = {
+        status: 'Error',
+        statusText: 'Network Error',
+        headers: {},
+        body: `[API Fetch Error]\n${err.message}\n\n※URLやCORS制限、認証情報をご確認ください。`
+      };
     }
 
     // データの保存と結果用タブの処理
-    await chrome.storage.local.set({ 'latestApiResponse': rawResponseText });
+    await chrome.storage.local.set({ 'latestApiResponse': responseData });
     const targetUrl = chrome.runtime.getURL('response.html');
 
     const tabs = await chrome.tabs.query({ url: targetUrl });
     if (tabs.length > 0) {
       const targetTabId = tabs[0].id;
-      chrome.tabs.sendMessage(targetTabId, { action: 'refresh', data: rawResponseText });
+      chrome.tabs.sendMessage(targetTabId, { action: 'refresh', data: responseData });
       chrome.tabs.update(targetTabId, { active: true });
     } else {
       chrome.tabs.create({ url: 'response.html' });

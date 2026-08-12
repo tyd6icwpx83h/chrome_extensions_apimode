@@ -81,7 +81,6 @@ function createJsonTree(data) {
 }
 
 // データの表示制御処理
-// データの表示制御処理
 function displayData(dataObj) {
   responseArea.innerHTML = '';
 
@@ -132,25 +131,6 @@ function displayData(dataObj) {
     pre.style.wordBreak = 'break-all';
     pre.textContent = rawBody;
     responseArea.appendChild(pre);
-  }
-}
-
-  try {
-    // JSONパースを試みる
-    const parsed = JSON.parse(currentData);
-
-    // JSONツリー要素を作成して挿入
-    const rootDetails = document.createElement('details');
-    rootDetails.open = true;
-    const summary = document.createElement('summary');
-    summary.textContent = Array.isArray(parsed) ? `JSON Array (${parsed.length} items)` : 'JSON Root Object';
-    rootDetails.appendChild(summary);
-    rootDetails.appendChild(createJsonTree(parsed));
-
-    responseArea.appendChild(rootDetails);
-  } catch (e) {
-    // JSONでない場合（プレーンテキストやHTMLなど）は未加工のままテキスト表示
-    responseArea.textContent = currentData;
   }
 }
 

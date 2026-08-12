@@ -3,8 +3,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   const apiUrlInput = document.getElementById('apiUrl');
   const urlHistorySelect = document.getElementById('urlHistory');
 
-  // --- URL履歴処理 ---
+  // --- フローティングラベルのアニメーション制御 ---
+  const handleLabelFocus = (input) => {
+    const wrap = input.closest('.nice-wrap');
+    if (!wrap) return;
+    const label = wrap.querySelector('.nice-label');
+    if (!label) return;
+
+    if (input.value.trim().length > 0 || document.activeElement === input) {
+      label.classList.add('focus');
+    } else {
+      label.classList.remove('focus');
+    }
+  };
+
+  // 画面全体で focusin / focusout / input イベントをキャッチ（動的追加項目にも自動対応）
+  document.addEventListener('focusin', (e) => {
+    if (e.target.classList.contains('nice-textbox')) handleLabelFocus(e.target);
+  });
+
+  document.addEventListener('focusout', (e) => {
+    if (e.target.classList.contains('nice-textbox')) handleLabelFocus(e.target);
+  });
+
+  document.addEventListener('input', (e) => {
+    if (e.target.classList.contains('nice-textbox')) handleLabelFocus(e.target);
+  });
+
+  // --- URL履歴の読み込みと選択処理 ---
   const MAX_HISTORY = 5;
+
   const updateHistoryDropdown = (historyList) => {
     urlHistorySelect.innerHTML = '<option value="">-- 過去に使用したURLから選択 --</option>';
     historyList.forEach(url => {
@@ -19,7 +47,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateHistoryDropdown(urlHistory);
 
   urlHistorySelect.addEventListener('change', (e) => {
-    if (e.target.value) apiUrlInput.value = e.target.value;
+    if (e.target.value) {
+      apiUrlInput.value = e.target.value;
+      handleLabelFocus(apiUrlInput); // ラベルのフォーカス位置を調整
+    }
   });
 
   const saveUrlToHistory = async (newUrl) => {
@@ -27,7 +58,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let history = data.urlHistory || [];
     history = history.filter(url => url !== newUrl);
     history.unshift(newUrl);
-    if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+
+    if (history.length > MAX_HISTORY) {
+      history = history.slice(0, MAX_HISTORY);
+    }
+
     await chrome.storage.local.set({ urlHistory: history });
     updateHistoryDropdown(history);
   };
@@ -43,11 +78,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (type === 'none') {
       authInputContainer.style.display = 'none';
       authInput.value = '';
+      handleLabelFocus(authInput);
     } else {
       authInputContainer.style.display = 'flex';
-      if (type === 'bearer') authInput.placeholder = 'Bearerトークン文字列（Bearerの入力は不要）';
-      else if (type === 'jwt') authInput.placeholder = 'eyJhbGciOi... (JWT文字列)';
-      else if (type === 'oauth2') authInput.placeholder = 'OAuth 2.0 アクセストークン';
+      const label = authInputContainer.querySelector('.nice-label');
+      if (type === 'bearer') {
+        if (label) label.textContent = 'Bearerトークン文字列';
+      } else if (type === 'jwt') {
+        if (label) label.textContent = 'eyJhbGciOi... (JWT)';
+      } else if (type === 'oauth2') {
+        if (label) label.textContent = 'OAuth 2.0 アクセストークン';
+      }
     }
   });
 
@@ -64,14 +105,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // --- オプション入力行の追加・削除 ---
+  // --- オプション入力行の追加・削除イベントの制御 ---
   container.addEventListener('click', (e) => {
     if (e.target.classList.contains('add-btn')) {
       const newRow = document.createElement('div');
       newRow.className = 'option-row';
       newRow.innerHTML = `
-        <input type="text" class="opt-key" placeholder="Key">
-        <input type="text" class="opt-val" placeholder="Value">
+        <div class="nice-wrap" style="margin-top:0;">
+          <input type="text" class="opt-key nice-textbox">
+          <label class="nice-label">Header Key</label>
+        </div>
+        <div class="nice-wrap" style="margin-top:0;">
+          <input type="text" class="opt-val nice-textbox">
+          <label class="nice-label">Value</label>
+        </div>
         <button type="button" class="btn-small add-btn">＋</button>
         <button type="button" class="btn-small remove-btn">ー</button>
       `;
@@ -96,6 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // URL履歴を保存
     await saveUrlToHistory(url);
 
     // オプション項目の収集
@@ -110,7 +158,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 認証ヘッダーの付与制御
     if (authType !== 'none' && rawAuthValue) {
       if (authType === 'bearer' || authType === 'jwt' || authType === 'oauth2') {
-        // 先頭に Bearer が付いていなければ自動補完
         const token = rawAuthValue.replace(/^Bearer\s+/i, '');
         headers['Authorization'] = `Bearer ${token}`;
       }

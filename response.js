@@ -81,13 +81,59 @@ function createJsonTree(data) {
 }
 
 // データの表示制御処理
-function displayData(data) {
-  currentData = data || '';
+// データの表示制御処理
+function displayData(dataObj) {
   responseArea.innerHTML = '';
 
-  if (!currentData.trim()) {
-    return;
+  if (!dataObj) return;
+
+  // データ構造がオブジェクト（{status, body, ...}）かテキストか判定
+  const rawBody = typeof dataObj === 'string' ? dataObj : (dataObj.body || '');
+  currentData = rawBody; // CSV用にボディデータをセット
+
+  // ステータス情報の表示用ヘッダーを作成
+  if (typeof dataObj === 'object' && dataObj.status) {
+    const statusDiv = document.createElement('div');
+    statusDiv.style.marginBottom = '12px';
+    statusDiv.style.padding = '8px';
+    statusDiv.style.borderRadius = '4px';
+    statusDiv.style.fontWeight = 'bold';
+
+    if (typeof dataObj.status === 'number' && dataObj.status >= 200 && dataObj.status < 300) {
+      statusDiv.style.backgroundColor = '#e6ffed';
+      statusDiv.style.color = '#22863a';
+    } else {
+      statusDiv.style.backgroundColor = '#ffeef0';
+      statusDiv.style.color = '#cb2431';
+    }
+
+    statusDiv.textContent = `Status: ${dataObj.status} ${dataObj.statusText || ''}`;
+    responseArea.appendChild(statusDiv);
   }
+
+  if (!rawBody.trim()) return;
+
+  try {
+    // JSONパースを試みる
+    const parsed = JSON.parse(rawBody);
+
+    const rootDetails = document.createElement('details');
+    rootDetails.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = Array.isArray(parsed) ? `JSON Array (${parsed.length} items)` : 'JSON Root Object';
+    rootDetails.appendChild(summary);
+    rootDetails.appendChild(createJsonTree(parsed));
+
+    responseArea.appendChild(rootDetails);
+  } catch (e) {
+    // JSONでない場合はそのままテキスト表示
+    const pre = document.createElement('pre');
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.wordBreak = 'break-all';
+    pre.textContent = rawBody;
+    responseArea.appendChild(pre);
+  }
+}
 
   try {
     // JSONパースを試みる

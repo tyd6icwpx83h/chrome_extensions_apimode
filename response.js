@@ -57,7 +57,7 @@ function createJsonTree(data) {
       const val = data[key];
       if (val !== null && typeof val === 'object') {
         const details = document.createElement('details');
-        details.open = true; // デフォルトで展開
+        details.open = true;
 
         const summary = document.createElement('summary');
         summary.appendChild(keySpan);
@@ -86,11 +86,9 @@ function displayData(dataObj) {
 
   if (!dataObj) return;
 
-  // データ構造がオブジェクト（{status, body, ...}）かテキストか判定
   const rawBody = typeof dataObj === 'string' ? dataObj : (dataObj.body || '');
-  currentData = rawBody; // CSV用にボディデータをセット
+  currentData = rawBody;
 
-  // ステータス情報の表示用ヘッダーを作成
   if (typeof dataObj === 'object' && dataObj.status) {
     const statusDiv = document.createElement('div');
     statusDiv.style.marginBottom = '12px';
@@ -113,7 +111,6 @@ function displayData(dataObj) {
   if (!rawBody.trim()) return;
 
   try {
-    // JSONパースを試みる
     const parsed = JSON.parse(rawBody);
 
     const rootDetails = document.createElement('details');
@@ -125,7 +122,6 @@ function displayData(dataObj) {
 
     responseArea.appendChild(rootDetails);
   } catch (e) {
-    // JSONでない場合はそのままテキスト表示
     const pre = document.createElement('pre');
     pre.style.whiteSpace = 'pre-wrap';
     pre.style.wordBreak = 'break-all';
@@ -134,53 +130,28 @@ function displayData(dataObj) {
   }
 }
 
-// JSONオブジェクトをフラットなキー・パスと値の配列に変換する関数
-function flattenJson(data, prefix = '') {
-  let rows = [];
+// オブジェクトをフラット化（キー・パス展開）する補助関数
+function flattenObject(obj, prefix = '') {
+  let flattened = {};
+  if (!obj || typeof obj !== 'object') return { [prefix]: obj };
 
-  if (data === null || data === undefined) {
-    rows.push([prefix, '']);
-    return rows;
-  }
+  Object.keys(obj).forEach((key) => {
+    const keyPath = prefix ? `${prefix}.${key}` : key;
+    const val = obj[key];
 
-  if (typeof data === 'object') {
-    if (Array.isArray(data)) {
-      if (data.length === 0) {
-        rows.push([prefix, '[]']);
-      } else {
-        data.forEach((item, index) => {
-          const keyPath = prefix ? `${prefix}[${index}]` : `[${index}]`;
-          if (item !== null && typeof item === 'object') {
-            rows = rows.concat(flattenJson(item, keyPath));
-          } else {
-            rows.push([keyPath, String(item ?? '')]);
-          }
-        });
-      }
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      Object.assign(flattened, flattenObject(val, keyPath));
+    } else if (Array.isArray(val)) {
+      flattened[keyPath] = JSON.stringify(val);
     } else {
-      const keys = Object.keys(data);
-      if (keys.length === 0) {
-        rows.push([prefix, '{}']);
-      } else {
-        keys.forEach((key) => {
-          const keyPath = prefix ? `${prefix}.${key}` : key;
-          const val = data[key];
-          if (val !== null && typeof val === 'object') {
-            rows = rows.concat(flattenJson(val, keyPath));
-          } else {
-            rows.push([keyPath, String(val ?? '')]);
-          }
-        });
-      }
+      flattened[keyPath] = val;
     }
-  } else {
-    rows.push([prefix, String(data)]);
-  }
+  });
 
-  return rows;
+  return flattened;
 }
 
-// CSVエスケープ処理（カンマや改行、ダブルクォーテーションに対応）
+// CSVエスケープ処理
 function escapeCsvCell(cell) {
   const str = String(cell ?? '');
   if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
@@ -189,75 +160,99 @@ function escapeCsvCell(cell) {
   return str;
 }
 
-// 初回読み込み：storageから取得
+// 初回読み込み
 chrome.storage.local.get('latestApiResponse', (result) => {
   if (result.latestApiResponse) {
     displayData(result.latestApiResponse);
   }
 });
 
-// storageの更新を監視（タブが開いた直後の更新に対応）
+// Storage監視
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.latestApiResponse) {
     displayData(changes.latestApiResponse.newValue);
   }
 });
 
-// ポップアップからの直接メッセージ受信用
+// メッセージ受信
 chrome.runtime.onMessage.addListener((request) => {
   if (request.action === 'refresh') {
     displayData(request.data);
   }
 });
 
-// CSVダウンロード処理
+// --- 起点オブジェクトからの行列CSV変換処理 ---
 downloadBtn.addEventListener('click', () => {
   let csvRows = [];
 
   try {
     const parsed = JSON.parse(currentData);
 
-    // パターン1: 配列（Array）形式で、要素がオブジェクトの場合（表形式で出力）
-    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null) {
-      const allHeaders = [];
-      parsed.forEach(obj => {
-        if (obj && typeof obj === 'object') {
-          Object.keys(obj).forEach(k => {
-            if (!allHeaders.includes(k)) {
-              allHeaders.push(k);
-            }
-          });
+    // パターン1: トップレベルが配列の場合
+    if (Array.isArray(parsed)) {
+      const flattenedArray = parsed.map((item) => typeof item === 'object' ? flattenObject(item) : { value: item });
+      const allHeaders = Array.from(new Set(flattenedArray.flatMap(obj => Object.keys(obj))));
+
+      csvRows.push(allHeaders.map(escapeCsvCell).join(','));
+
+      flattenedArray.forEach((item) => {
+        const row = allHeaders.map(h => escapeCsvCell(item[h] ?? ''));
+        csvRows.push(row.join(','));
+      });
+    } 
+    // パターン2: トップレベルが単一のオブジェクトの場合（起点固定＋内部配列の行展開）
+    else if (typeof parsed === 'object' && parsed !== null) {
+      const rootObject = {};
+      let targetArrayKey = null;
+      let targetArray = null;
+
+      // 親オブジェクトの属性と内部の配列項目を切り分け
+      Object.keys(parsed).forEach((key) => {
+        if (Array.isArray(parsed[key]) && targetArray === null) {
+          targetArrayKey = key;
+          targetArray = parsed[key];
+        } else {
+          rootObject[key] = parsed[key];
         }
       });
 
-      // ヘッダー行を追加
-      csvRows.push(allHeaders.map(escapeCsvCell).join(','));
+      const flatRoot = flattenObject(rootObject);
 
-      // 各データ行を追加
-      parsed.forEach(obj => {
-        const row = allHeaders.map(header => {
-          const val = obj ? obj[header] : '';
-          if (val !== null && typeof val === 'object') {
-            return escapeCsvCell(JSON.stringify(val));
+      // 配列要素が存在する場合：起点（親）情報 ＋ 配列要素を行毎に結合
+      if (targetArray && targetArray.length > 0) {
+        const flatArrayItems = targetArray.map((item, idx) => {
+          if (typeof item === 'object' && item !== null) {
+            return flattenObject(item, targetArrayKey);
           }
-          return escapeCsvCell(val);
+          return { [`${targetArrayKey}[${idx}]`]: item };
         });
-        csvRows.push(row.join(','));
-      });
 
-    } else {
-      // パターン2: 階層オブジェクト形式の場合（キー・パス列 と 値列 に分解して出力）
-      csvRows.push(['キー / パス (Key/Path)', '値 (Value)'].map(escapeCsvCell).join(','));
+        const arrayHeaders = Array.from(new Set(flatArrayItems.flatMap(obj => Object.keys(obj))));
+        const allHeaders = [...Object.keys(flatRoot), ...arrayHeaders];
 
-      const flatData = flattenJson(parsed);
-      flatData.forEach(([keyPath, val]) => {
-        csvRows.push([escapeCsvCell(keyPath), escapeCsvCell(val)].join(','));
-      });
+        csvRows.push(allHeaders.map(escapeCsvCell).join(','));
+
+        flatArrayItems.forEach((arrayItem) => {
+          const row = allHeaders.map((header) => {
+            if (header in flatRoot) {
+              return escapeCsvCell(flatRoot[header] ?? '');
+            }
+            return escapeCsvCell(arrayItem[header] ?? '');
+          });
+          csvRows.push(row.join(','));
+        });
+      } 
+      // 配列が含まれない単純オブジェクトの場合：1行として出力
+      else {
+        const allHeaders = Object.keys(flatRoot);
+        csvRows.push(allHeaders.map(escapeCsvCell).join(','));
+        csvRows.push(allHeaders.map(h => escapeCsvCell(flatRoot[h] ?? '')).join(','));
+      }
     }
 
   } catch (e) {
-    // JSON以外（プレーンテキスト・HTML等）の場合は1セルに1行ずつ分割出力
-    csvRows.push(['行番号', 'テキスト内容'].map(escapeCsvCell).join(','));
+    // 非JSONデータ（プレーンテキスト）の場合
+    csvRows.push(['Line Number', 'Text Content'].map(escapeCsvCell).join(','));
     const lines = currentData.split(/\r?\n/);
     lines.forEach((line, index) => {
       csvRows.push([escapeCsvCell(index + 1), escapeCsvCell(line)].join(','));
@@ -266,7 +261,7 @@ downloadBtn.addEventListener('click', () => {
 
   const csvContent = csvRows.join('\r\n');
 
-  // BOM付与（Excel文字化け防止）してダウンロード実行
+  // UTF-8 BOM付きでダウンロード実行
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
